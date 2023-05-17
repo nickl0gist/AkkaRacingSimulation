@@ -8,25 +8,31 @@ package manager;
  */
 class RacerData {
     private Integer currentPosition;
-    private Boolean status;
-    private Double time;
+    private Long finishingTimes;
+    private int index;
 
+    public Long getFinishingTimes() {
+        return finishingTimes;
+    }
+
+    public void setFinishingTimes(Long finishingTimes){
+        this.finishingTimes = finishingTimes;
+    }
 
     public Integer getCurrentPosition() {
         return currentPosition;
     }
 
-    public Boolean getStatus() {
-        return status;
-    }
-
-    public Double getTime() {
-        return time;
-    }
-
-    public RacerData(Integer currentPosition, Boolean status, Double time) {
+    public void setCurrentPosition(Integer currentPosition) {
         this.currentPosition = currentPosition;
-        this.status = status;
-        this.time = time;
+    }
+
+    public int getIndex() {
+        return index;
+    }
+
+    public RacerData(int index, Integer currentPosition) {
+        this.index = index;
+        this.currentPosition = currentPosition;
     }
 }

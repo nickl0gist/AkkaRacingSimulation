@@ -5,6 +5,7 @@ import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
+import manager.RacerFinishedCommand;
 import manager.RacerUpdateCommand;
 
 import java.util.Random;
@@ -19,13 +20,13 @@ public class Racer extends AbstractBehavior<Command> {
         return Behaviors.setup(Racer::new);
     }
 
-    private final double defaultAverageSpeed = 48.2;
+    private static final double DEFAULT_AVERAGE_SPEED = 48.2;
     private int averageSpeedAdjustmentFactor;
     private Random random;
 
 
     private double getMaxSpeed() {
-        return defaultAverageSpeed * (1 + ((double) averageSpeedAdjustmentFactor / 100));
+        return DEFAULT_AVERAGE_SPEED * (1 + ((double) averageSpeedAdjustmentFactor / 100));
     }
 
     private double getDistanceMovedPerSecond(double currentSpeed) {
@@ -61,44 +62,39 @@ public class Racer extends AbstractBehavior<Command> {
                 .onMessage(StartCommand.class, message -> {
                     this.random = new Random();
                     this.averageSpeedAdjustmentFactor = random.nextInt(30) - 10;
-                    return race(message.getRaceLength(), 0, false, 0, 0);
+                    return race(message.getRaceLength(), 0, 0);
                 })
                 .onMessage(PositionCommand.class, message -> {
-                    message.getController().tell(new RacerUpdateCommand(getContext().getSelf(), 0, false, 0));
+                    message.getController().tell(new RacerUpdateCommand(getContext().getSelf(), 0));
                     return Behaviors.same();
                 })
                 .build();
     }
 
-    public Receive<Command> race(int raceLength, int currentPosition, boolean isFinished, double currentTime, double currentSpeed) {
+    public Receive<Command> race(int raceLength, int currentPosition, double currentSpeed) {
         return newReceiveBuilder().onMessage(PositionCommand.class, message -> {
             double speed = determineNextSpeed(raceLength, currentPosition, currentSpeed);
             int newPosition = currentPosition;
-            boolean finished = isFinished;
-            double time = currentTime;
             newPosition += getDistanceMovedPerSecond(speed);
             if (newPosition >= raceLength) {
                 newPosition = raceLength;
-                if (!finished)
-                    time++;
-
-                finished = true;
-            } else {
-                time++;
             }
-            message.getController().tell(new RacerUpdateCommand(getContext().getSelf(), newPosition, finished, time));
-            if (finished) {
-                return finished(raceLength, time);
+            RacerUpdateCommand msg = new RacerUpdateCommand(getContext().getSelf(), newPosition);
+            msg.setCurrentTime(System.currentTimeMillis());
+            message.getController().tell(msg);
+            if (newPosition == raceLength) {
+                return finished(raceLength, msg.getCurrentTime());
             } else {
-                return race(raceLength, newPosition, false, time, speed);
+                return race(raceLength, newPosition, speed);
             }
         }).build();
     }
 
-    public Receive<Command> finished(int raceLength, double currentTime) {
+    public Receive<Command> finished(int raceLength, long currentTime) {
         return newReceiveBuilder().onMessage(PositionCommand.class, message -> {
-            message.getController().tell(new RacerUpdateCommand(getContext().getSelf(), raceLength, true, currentTime));
-            return Behaviors.same();
+            message.getController().tell(new RacerUpdateCommand(getContext().getSelf(), raceLength));
+            message.getController().tell(new RacerFinishedCommand(getContext().getSelf(), currentTime));
+            return Behaviors.ignore();
         }).build();
     }
 }
